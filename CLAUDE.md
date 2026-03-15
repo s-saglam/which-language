@@ -72,6 +72,7 @@ lib/
     base_codex.rb         # Abstract interface
     claude_codex.rb       # Claude Code CLI adapter
     gemini_codex.rb       # Google Gemini API adapter
+    openai_codex.rb       # OpenAI Responses API adapter
   codex_loader.rb         # Loads and instantiates adapters
 config/
   codexes.yml             # Codex configuration
@@ -117,10 +118,11 @@ This benchmark originally targeted Claude Code, but has been refactored to suppo
 ### Current Support
 - ✅ **Claude Code** (Anthropic) - Original implementation
 - ✅ **Gemini** (Google) - API integration with Flash-Lite/Pro
+- ✅ **OpenAI** - Responses API integration
 
 ### Planned Integrations
 See **[ROADMAP.md](./ROADMAP.md)** for the complete list of 20+ planned codexes including:
-- 🔴 **High Priority**: OpenAI (GPT-4o, o3), DeepSeek (V3.2, R1)
+- 🔴 **High Priority**: DeepSeek (V3.2, R1)
 - 🟡 **Medium Priority**: Qwen (3.5 Coder), Aider, Cline, Grok 3
 - 🟢 **Future**: Llama 4, Mistral, GLM-4.7, self-hosted models
 

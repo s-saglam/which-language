@@ -14,6 +14,7 @@ Examples:
 
 - Claude Code CLI for `claude`
 - a Gemini API key for `gemini`
+- an OpenAI API key for `openai`
 
 ## Step 1: work from the repository root
 
@@ -57,6 +58,25 @@ This local file is gitignored.
 
 If Gemini says it is not enabled, create the local override above instead of editing the shared config.
 
+### OpenAI
+
+Use the same local override pattern for `openai`:
+
+```yaml
+codexes:
+  openai:
+    enabled: true
+    config:
+      api_key: "${OPENAI_API_KEY}"
+      model_name: "gpt-4.1"
+```
+
+Then export your key:
+
+```bash
+export OPENAI_API_KEY="your-key"
+```
+
 ## Step 3: run a safe dry-run first
 
 Recommended:
@@ -91,6 +111,37 @@ bash scripts/run-all.sh gemini minigit --lang python --trials 1
 
 ```bash
 bash scripts/run-all.sh claude minigit --lang python --trials 1
+```
+
+### OpenAI end-to-end example
+
+If you want the full pipeline for OpenAI in one command (benchmark + report + figures):
+
+```bash
+bash scripts/run-all.sh openai minigit --lang python --trials 1
+```
+
+That helper script runs these stages for you:
+
+1. `benchmark.rb`
+2. `report.rb`
+3. `plot.py`
+
+If you want to run the same flow step by step, use:
+
+```bash
+ruby benchmark.rb --codex openai --problem minigit --lang python --trials 1
+ruby report.rb \
+  --results artifacts/openai/minigit/results/results.json \
+  --meta artifacts/openai/minigit/results/meta.json \
+  --output artifacts/openai/minigit/results/report.md
+python3 plot.py artifacts/openai/minigit/results/results.json
+```
+
+For dry-run validation without a paid API call:
+
+```bash
+bash scripts/run-all.sh openai minigit --dry-run --lang python --trials 1
 ```
 
 ## Step 5: inspect the outputs
@@ -208,6 +259,14 @@ Export it before running:
 
 ```bash
 export GOOGLE_API_KEY="your-key"
+```
+
+### “OPENAI_API_KEY not configured”
+
+Export it before running:
+
+```bash
+export OPENAI_API_KEY="your-key"
 ```
 
 ### “Unknown language”

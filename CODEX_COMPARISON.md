@@ -6,7 +6,7 @@ A detailed comparison of AI coding assistants for benchmarking purposes.
 
 | Feature | Claude Code | Gemini | OpenAI | DeepSeek | Qwen | Aider |
 |---------|-------------|--------|--------|----------|------|-------|
-| **Status** | ✅ Supported | ✅ Supported | 🚧 Planned | 🚧 Planned | 🚧 Planned | 🚧 Planned |
+| **Status** | ✅ Supported | ✅ Supported | ✅ Supported | 🚧 Planned | 🚧 Planned | 🚧 Planned |
 | **Type** | CLI Tool | Cloud API | Cloud API | Cloud API | Cloud API | CLI Tool |
 | **Interface** | Command Line | REST API | REST API | REST API | REST API | Command Line |
 | **Authentication** | Session-based | API Key | API Key | API Key | API Key | Config file |
@@ -74,16 +74,17 @@ A detailed comparison of AI coding assistants for benchmarking purposes.
 - Python: 167.9s, $0.004907, 138 LOC (39/40 passed)
 - Ruby: 136.5s, $0.003918, 154 LOC (29/40 passed)
 
-### 3. OpenAI (GPT-4o, o3, o4-mini)
+### 3. OpenAI (gpt-4.1, GPT-4o, o3, o4-mini)
 
-**Status**: 🚧 **Planned**
+**Status**: ✅ **Implemented**
 
-- **Models**: GPT-4o, o3, o4-mini
+- **Models**: gpt-4.1, GPT-4o, o3, o4-mini
 - **Interface**: OpenAI API
-- **Expected Integration**:
-  - REST API via `net/http` or `openai-ruby`
-  - Chat Completions endpoint
-  - Function calling support
+- **Current Integration**:
+  - REST API via `net/http`
+  - Responses API endpoint
+  - Optional `OpenAI-Organization` / `OpenAI-Project` headers
+  - Optional explicit pricing config for cost accounting
 - **Pricing** (estimated):
   - GPT-4o: $5/$15 per 1M tokens (in/out)
   - o3: Higher (TBD)
@@ -97,11 +98,10 @@ A detailed comparison of AI coding assistants for benchmarking purposes.
   - No free tier
   - Context limit (128K for GPT-4o)
 
-**Expected Adapter**:
+**Adapter**:
 ```ruby
 class OpenAICodex < BaseCodex
-  API_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
-  # Implementation similar to GeminiCodex
+  API_ENDPOINT = 'https://api.openai.com/v1/responses'
 end
 ```
 

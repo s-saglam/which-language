@@ -19,20 +19,25 @@ codexes:
       model_name: "gemini-3.1-flash-lite-preview"
       cooldown_seconds: 1.2
 
+  openai:
+    enabled: false
+    class: OpenAICodex
+    config:
+      # Get your API key from https://platform.openai.com/
+      api_key: "${OPENAI_API_KEY}"
+      model_name: "gpt-4.1"
+      organization: "${OPENAI_ORG_ID}"  # Optional
+      project: "${OPENAI_PROJECT_ID}"  # Optional
+      cooldown_seconds: 0.5
+      timeout_seconds: 1200
+      # Optional explicit pricing for cost accounting (USD / 1M tokens):
+      # price_input_1m: 0.0
+      # price_cached_input_1m: 0.0
+      # price_output_1m: 0.0
+
   # =========================================================================
   # PLANNED CODEXES (Templates - uncomment and configure to enable)
   # =========================================================================
-
-  # OpenAI (GPT-4o, o3, o4-mini)
-  # Priority: HIGH | Status: Planned
-  # Cost: ~$5-15/1M tokens | Free tier: No
-  # openai:
-  #   enabled: false
-  #   class: OpenAICodex
-  #   config:
-  #     api_key: "${OPENAI_API_KEY}"
-  #     model_name: "gpt-4o"  # Options: gpt-4o, o3, o4-mini
-  #     organization: "${OPENAI_ORG_ID}"  # Optional
 
   # DeepSeek (V3.2, R1)
   # Priority: HIGH | Status: Planned

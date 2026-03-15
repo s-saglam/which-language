@@ -53,14 +53,28 @@ class CodexLoader
     raise "Codex '#{name}' is not enabled" unless codex_config['enabled']
 
     class_name = codex_config['class']
-    adapter_config = codex_config['config'] || {}
+    adapter_config = symbolize_keys(codex_config['config'] || {})
+    adapter_file = codex_config['file'] || "#{name.tr('-', '_')}_codex"
 
     # Require the adapter file
-    require_relative "codexes/#{class_name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase}"
+    require_relative "codexes/#{adapter_file}"
 
     # Instantiate the adapter
     Object.const_get(class_name).new(adapter_config)
   rescue NameError => e
     raise "Failed to load codex class '#{class_name}': #{e.message}"
+  end
+
+  def self.symbolize_keys(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested_value), memo|
+        memo[key.respond_to?(:to_sym) ? key.to_sym : key] = symbolize_keys(nested_value)
+      end
+    when Array
+      value.map { |item| symbolize_keys(item) }
+    else
+      value
+    end
   end
 end

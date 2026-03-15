@@ -10,6 +10,7 @@ This document tracks the implementation status and plans for supporting various 
 |-------|----------|------|--------|-------|
 | **Claude Code** | Anthropic | CLI | ✅ Complete | Default codex, full integration with Opus/Sonnet models |
 | **Gemini** | Google | API | ✅ Complete | Gemini 3.1 Flash-Lite/Pro, 1M context, free tier: 1000 req/day |
+| **OpenAI Codex** | OpenAI | API | ✅ Complete | Responses API adapter with configurable model, headers, and cost accounting |
 
 ## Planned Implementations
 
@@ -17,7 +18,6 @@ This document tracks the implementation status and plans for supporting various 
 
 | Codex | Provider | Type | Priority | Notes |
 |-------|----------|------|----------|-------|
-| **OpenAI Codex** | OpenAI | API | 🔴 High | GPT-4o, o3, o4-mini support via API |
 | **DeepSeek** | DeepSeek | API | 🔴 High | V3.2 (685B), R1 (671B), cheapest powerful model $0.27/1M token |
 | **Qwen Code** | Alibaba | API | 🟡 Medium | Qwen 3 Coder (480B), Qwen 3.5 (397B), SWE-Bench Pro 38.7% |
 
@@ -72,7 +72,7 @@ This document tracks the implementation status and plans for supporting various 
 ### Phase 1: Major Cloud APIs (Q2 2026)
 1. ✅ Claude Code (Complete)
 2. ✅ Gemini (Complete)
-3. 🔴 OpenAI (GPT-4o, o3, o4-mini)
+3. ✅ OpenAI (Responses API)
 4. 🔴 DeepSeek (V3.2, R1)
 
 ### Phase 2: High-Performance Models (Q3 2026)

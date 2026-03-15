@@ -3,7 +3,7 @@
 Benchmark platform for comparing **AI coding systems** across three axes:
 
 - **problem** — e.g. MiniGit today, more tomorrow
-- **codex** — Claude, Gemini, and future adapters
+- **codex** — Claude, Gemini, OpenAI, and future adapters
 - **language** — Python, Ruby, Rust, Go, TypeScript, etc.
 
 The repository started as a Claude-focused MiniGit experiment and is now being generalized into a reusable **multi-problem, multi-codex, multi-language benchmark harness**.
@@ -28,7 +28,7 @@ Think of the benchmark as a matrix:
 | Dimension | Defined by | Example |
 |----------|------------|---------|
 | Problem | `problems/<problem>/problem.json` + assets | `minigit` |
-| Codex | `lib/codexes/*.rb` + `config/codexes*.yml` | `claude`, `gemini` |
+| Codex | `lib/codexes/*.rb` + `config/codexes*.yml` | `claude`, `gemini`, `openai` |
 | Language | `LANGUAGES` in `benchmark.rb` | `python`, `rust`, `ruby/steep` |
 
 Each benchmark run writes outputs under a namespaced root:
@@ -163,8 +163,9 @@ Each entry provides things like:
 |------|--------|-------|
 | Claude Code | ✅ | default CLI adapter |
 | Gemini | ✅ | API adapter with metrics extraction |
+| OpenAI | ✅ | Responses API adapter with optional cost accounting |
 
-See [ROADMAP.md](./ROADMAP.md) for planned adapters such as OpenAI, DeepSeek, Qwen, Aider, Cline, and more.
+See [ROADMAP.md](./ROADMAP.md) for planned adapters such as DeepSeek, Qwen, Aider, Cline, and more.
 
 ### Languages currently benchmarkable
 
