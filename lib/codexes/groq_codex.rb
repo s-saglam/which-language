@@ -8,27 +8,34 @@ require 'time'
 require 'fileutils'
 require 'openssl'
 
-# Groq API adapter (OpenAI Compatible) - Multi-Language Production Grade
+# GroqCodex: Adapter for high-performance inference via Groq API.
+# Metadata and detailed descriptions are handled via config/codexes.yml.
 class GroqCodex < BaseCodex
+  # Groq API endpoint for chat completions
   API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-  # Groq Llama 3.3 70B Pricing (March 2026)
-  PRICE_INPUT_1M = 0.08
-  PRICE_OUTPUT_1M = 0.24
-
   def initialize(config = {})
-    super('groq', config)
+    super('groq', config) # Shared configs (mappings, extensions, etc.) are handled by BaseCodex
     @api_key = config[:api_key] || ENV['GROQ_API_KEY']
-    @model_name = config[:model] || config[:model_name] || 'moonshotai/kimi-k2-instruct-0905'
+    
+    # Model name and cooldown configuration fetched from config/codexes.yml
+    @model_name = config[:model] || config[:model_name]
     @cooldown_seconds = config[:cooldown_seconds] || 1.5
 
+    # Pricing metrics loaded dynamically from external configuration
+    @price_input_1m = config[:price_input_1m] || 0.0
+    @price_output_1m = config[:price_output_1m] || 0.0
+
+    # Ensure essential configuration is present before proceeding
     raise CodexError, 'GROQ_API_KEY not configured' unless @api_key
+    raise CodexError, 'Model name not configured for Groq' unless @model_name
   end
 
   def version
     @model_name
   end
 
+  # Performs a lightweight request to verify API connectivity and model readiness
   def warmup(warmup_dir)
     puts "  Warmup: Running trivial prompt on Groq (#{@model_name})..."
     result = run_generation('Respond with just OK.', dir: warmup_dir)
@@ -37,6 +44,7 @@ class GroqCodex < BaseCodex
     result
   end
 
+  # Main generation loop: Calls API, calculates costs, logs metadata, and saves files
   def run_generation(prompt, dir:, log_path: nil)
     start_time = Time.now
 
@@ -45,6 +53,7 @@ class GroqCodex < BaseCodex
       cost_usd = calculate_cost(input_tokens, output_tokens)
       elapsed = Time.now - start_time
 
+      # Persistent logging for audit trails and performance analysis
       if log_path
         FileUtils.mkdir_p(File.dirname(log_path))
         log_data = {
@@ -59,8 +68,9 @@ class GroqCodex < BaseCodex
         File.write(log_path, JSON.pretty_generate(log_data))
       end
 
+      # Post-processing: Extract and store the generated source code (Delegated to BaseCodex)
       save_generated_code(response_text, dir)
-      sleep(@cooldown_seconds)
+      sleep(@cooldown_seconds) # Respect rate limits
 
       {
         success: true,
@@ -88,9 +98,11 @@ class GroqCodex < BaseCodex
 
   private
 
+  # Executes the HTTP POST request to the Groq backend
   def call_groq_api(prompt)
     uri = URI.parse(API_URL)
     
+    # Enforces strict output format via system instruction
     system_instruction = <<~TEXT
       You are a senior software engineer. 
       Respond ONLY with the source code. 
@@ -104,7 +116,7 @@ class GroqCodex < BaseCodex
         { role: 'system', content: system_instruction },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.1,
+      temperature: 0.1, # Minimize randomness for deterministic code generation
       max_tokens: 4096 
     }
 
@@ -131,154 +143,10 @@ class GroqCodex < BaseCodex
     [response_text, usage['prompt_tokens'] || 0, usage['completion_tokens'] || 0]
   end
 
+  # Cost calculation based on per-million token pricing from config
   def calculate_cost(input_tokens, output_tokens)
-    input_cost = (input_tokens / 1_000_000.0) * PRICE_INPUT_1M
-    output_cost = (output_tokens / 1_000_000.0) * PRICE_OUTPUT_1M
+    input_cost = (input_tokens / 1_000_000.0) * @price_input_1m
+    output_cost = (output_tokens / 1_000_000.0) * @price_output_1m
     (input_cost + output_cost).round(8)
-  end
-
-  def save_generated_code(response_text, dir)
-    lang = read_benchmark_value(dir, '.benchmark-language') || infer_language_from_dir(dir)
-    binary_name = read_benchmark_value(dir, '.benchmark-binary-name') || 'minigit'
-    
-    blocks = extract_code_blocks(response_text, binary_name)
-    written_files = []
-
-    blocks.select { |block| block[:filename] }.each do |block|
-      path = File.join(dir, block[:filename])
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, block[:code])
-      written_files << block[:filename]
-    end
-
-    primary_block = choose_primary_block(blocks, lang)
-    if primary_block
-      target = primary_target_for(lang, binary_name: binary_name)
-      if target && !written_files.include?(target)
-        code = normalize_script_for_target(primary_block[:code], lang, target, binary_name: binary_name)
-        File.write(File.join(dir, target), code)
-        written_files << target
-      end
-    elsif written_files.empty? && response_text.length > 100
-      target = primary_target_for(lang, binary_name: binary_name) || binary_name
-      clean_code = response_text.gsub(/```[a-z0-9_+-]*|```/i, '').strip
-      code = normalize_script_for_target(clean_code, lang, target, binary_name: binary_name)
-      File.write(File.join(dir, target), code)
-      written_files << target
-    end
-
-    ensure_runtime_files(lang, dir, written_files, binary_name: binary_name)
-    
-    [binary_name, 'build.sh', 'Makefile'].each do |f|
-      path = File.join(dir, f)
-      FileUtils.chmod(0755, path) if File.exist?(path)
-    end
-  end
-
-  def extract_code_blocks(response_text, binary_name)
-    blocks = []
-    response_text.to_enum(:scan, /```[ \t]*(?<lang>[A-Za-z0-9_+-]*)[ \t]*\r?\n(?<code>.*?)```/m).each do
-      match = Regexp.last_match
-      context = response_text[[match.begin(0) - 400, 0].max...match.begin(0)]
-      blocks << {
-        fence_lang: match[:lang].to_s.downcase.strip,
-        filename: infer_filename_from_context(context, binary_name),
-        code: match[:code].strip
-      }
-    end
-    blocks
-  end
-
-  def infer_filename_from_context(context, binary_name)
-    binary_pattern = Regexp.escape(binary_name)
-    backticked = context.scan(/`([^`\n]+)`/).flatten.reverse.find do |token|
-      token.match?(/\A(?:#{binary_pattern}|Makefile|makefile|build\.sh|[\w.\/-]+\.(?:rb|py|go|rs|c|h|ts|js|java|pl|lua|scm|ml|hs|java|pl|pm|sh|php|cs|cpp|hpp))\z/)
-    end
-    return backticked if backticked
-    context[/file named\s+[`"]?([A-Za-z0-9._\/-]+)[`"]?/i, 1]
-  end
-
-  def choose_primary_block(blocks, lang)
-    return nil if blocks.empty?
-    # 15 Dil için genişletilmiş mapping
-    expected = { 
-      'python' => %w[python py], 
-      'ruby' => %w[ruby rb], 
-      'go' => %w[go], 
-      'rust' => %w[rust rs], 
-      'c' => %w[c cpp],
-      'lua' => %w[lua],
-      'scheme' => %w[scheme scm lisp racket],
-      'ocaml' => %w[ocaml ml],
-      'haskell' => %w[haskell hs],
-      'perl' => %w[perl pl pm],
-      'java' => %w[java],
-      'javascript' => %w[javascript js],
-      'typescript' => %w[typescript ts],
-      'php' => %w[php],
-      'csharp' => %w[csharp cs]
-    }.fetch(lang, [lang])
-    
-    blocks.find { |b| expected.include?(b[:fence_lang]) } || blocks.max_by { |b| b[:code].length }
-  end
-
-  def primary_target_for(lang, binary_name: 'minigit')
-    targets = { 
-      'python' => binary_name, 
-      'ruby' => binary_name, 
-      'go' => 'main.go', 
-      'rust' => 'main.rs', 
-      'c' => 'main.c',
-      'lua' => 'main.lua',
-      'scheme' => 'main.scm',
-      'ocaml' => 'main.ml',
-      'haskell' => 'main.hs',
-      'perl' => 'main.pl',
-      'java' => 'Main.java',
-      'javascript' => 'main.js',
-      'typescript' => 'main.ts',
-      'php' => 'main.php',
-      'csharp' => 'Program.cs'
-    }
-    targets[lang] || "#{binary_name}.#{lang}"
-  end
-
-  def normalize_script_for_target(code, lang, target, binary_name: 'minigit')
-    return code if code.start_with?('#!')
-    shebangs = { 
-      'python' => '#!/usr/bin/env python3', 
-      'ruby' => '#!/usr/bin/env ruby',
-      'perl' => '#!/usr/bin/env perl',
-      'lua' => '#!/usr/bin/env lua',
-      'javascript' => '#!/usr/bin/env node'
-    }
-    shebangs[lang] ? "#{shebangs[lang]}\n#{code}\n" : code
-  end
-
-  def ensure_runtime_files(lang, dir, written_files, binary_name: 'minigit')
-    case lang
-    when 'go' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\ngo build -o #{binary_name} main.go\n", written_files)
-    when 'rust' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\nrustc -O main.rs -o #{binary_name}\n", written_files)
-    when 'c' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\ngcc -O2 -o #{binary_name} main.c\n", written_files)
-    when 'ocaml' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\nocamlopt -o #{binary_name} main.ml\n", written_files)
-    when 'haskell' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\nghc -O2 -o #{binary_name} main.hs\n", written_files)
-    when 'java' then write_if_missing(dir, 'build.sh', "#!/usr/bin/env bash\njavac Main.java\n", written_files)
-    end
-  end
-
-  def read_benchmark_value(dir, filename)
-    path = File.join(dir, filename)
-    File.file?(path) ? File.read(path, encoding: 'UTF-8').strip : nil
-  rescue StandardError; nil; end
-
-  def infer_language_from_dir(dir)
-    dir_name = File.basename(dir)
-    dir_name[/-(rust|go|c|typescript|javascript|java|perl|python|ruby|lua|scheme|ocaml|haskell|php|csharp)-\d+-v[12]$/, 1] || 'python'
-  end
-
-  def write_if_missing(dir, rel_path, content, written)
-    return if written.include?(rel_path)
-    File.write(File.join(dir, rel_path), content)
-    written << rel_path
   end
 end
