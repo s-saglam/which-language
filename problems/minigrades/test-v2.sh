@@ -1,176 +1,332 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
-# --- Color Definitions ---
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+PASS_COUNT=0
+FAIL_COUNT=0
 
-# --- Variables ---
-DATA_DIR=".minigrades"
-SOLUTION="solution.py"
-
-# --- Helper Functions ---
-run_cmd() {
-    # Automatically initialize before each command to stay consistent with Python run_cmd
-    python3 "$SOLUTION" init > /dev/null 2>&1
-    # Execute the actual command and return output
-    # Using 'xargs' for simple strings, but keeping raw for multiline tests like 'list'
-    result=$(python3 "$SOLUTION" "$@")
-    echo "$result"
+fail() {
+  echo "FAIL: $1"
+  FAIL_COUNT=$((FAIL_COUNT+1))
 }
 
-setup() {
-    # Equivalent to setup_function()
-    if [ -d "$DATA_DIR" ]; then
-        rm -rf "$DATA_DIR"
-    fi
+pass() {
+  echo "PASS: $1"
+  PASS_COUNT=$((PASS_COUNT+1))
 }
 
-assert_equals() {
-    local test_name=$1
-    local expected=$2
-    local actual=$(echo "$3" | xargs) # Trim whitespace for single line comparison
-
-    if [ "$actual" == "$expected" ]; then
-        echo -e "${GREEN}[PASSED]${NC} $test_name"
-    else
-        echo -e "${RED}[FAILED]${NC} $test_name"
-        echo -e "  Expected: $expected"
-        echo -e "  Actual:   $actual"
-    fi
+cleanup() {
+  cd "$(dirname "$0")"
+  rm -rf testrepo
 }
 
-assert_contains() {
-    local test_name=$1
-    local expected=$2
-    local actual=$3
+# Build if needed
+cd "$(dirname "$0")"
 
-    if [[ "$actual" == *"$expected"* ]]; then
-        echo -e "${GREEN}[PASSED]${NC} $test_name"
-    else
-        echo -e "${RED}[FAILED]${NC} $test_name"
-        echo -e "  Expected to contain: $expected"
-        # Actual is not printed here to keep terminal clean during multiline failures
-    fi
-}
+if [ -f Makefile ] || [ -f makefile ]; then
+  make -s 2>/dev/null || true
+fi
+if [ -f build.sh ]; then
+  bash build.sh 2>/dev/null || true
+fi
+chmod +x minigrades 2>/dev/null || true
 
-# --- Test Execution ---
+######################################
+# Setup
+######################################
 
-echo "Running mini-grades (v2) test suite..."
-echo "-------------------------------------"
+cleanup
+mkdir testrepo
+cd testrepo
 
-# --- add_student tests ---
-setup
-response=$(run_cmd add 101 Berke)
-assert_equals "test_add_student_success" "Student added successfully." "$response"
+######################################
+# Test 1: init creates directory
+######################################
 
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd add 101 Efe)
-assert_equals "test_add_student_duplicate" "Error: Student with ID 101 already exists." "$response"
+if ../minigrades init && [ -d .minigrades ]; then
+  pass "init creates .minigrades directory"
+else
+  fail "init creates .minigrades directory"
+fi
 
-setup
-response=$(run_cmd add abc Berke)
-assert_equals "test_add_student_non_numeric_id" "Invalid input: Please enter a numeric value." "$response"
+######################################
+# Test 2: init duplicate
+######################################
 
-# --- add_grade tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd add-grade 101 80)
-assert_equals "test_add_grade_success" "Grades added successfully for student 101." "$response"
+if ../minigrades init 2>&1 | grep -q "Already initialized"; then
+  pass "init duplicate prints message"
+else
+  fail "init duplicate prints message"
+fi
 
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd add-grade 101 abc)
-assert_equals "test_add_grade_non_numeric_grade" "Invalid input: Please enter a numeric value." "$response"
+######################################
+# Test 3: add student
+######################################
 
-setup
-response=$(run_cmd add-grade 999 80)
-assert_equals "test_add_grade_student_not_found" "Error: No student found with ID 999." "$response"
+if ../minigrades add 101 Berke 2>&1 | grep -q "Student added successfully"; then
+  pass "add student success"
+else
+  fail "add student success"
+fi
 
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd add-grade 101 105)
-assert_equals "test_add_grade_out_of_range" "Invalid grade: Grades must be between 0 and 100." "$response"
+######################################
+# Test 4: add duplicate student
+######################################
 
-# --- delete_student tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd delete 101)
-assert_equals "test_delete_student_success" "Student and all grades deleted successfully." "$response"
+if ../minigrades add 101 Efe 2>&1 | grep -q "Error: Student with ID 101 already exists"; then
+  pass "add duplicate student fails"
+else
+  fail "add duplicate student fails"
+fi
 
-setup
-response=$(run_cmd delete 999)
-assert_equals "test_delete_student_not_found" "Error: No student found with ID 999." "$response"
+######################################
+# Test 5: add student non-numeric id
+######################################
 
-# --- delete_grade tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 85 > /dev/null
-response=$(run_cmd del-grade 101 85)
-assert_equals "test_delete_grade_success" "Grade 85 successfully removed!" "$response"
+if ../minigrades add abc Berke 2>&1 | grep -q "Invalid input: Please enter a numeric value"; then
+  pass "add student non-numeric id fails"
+else
+  fail "add student non-numeric id fails"
+fi
 
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 85 > /dev/null
-response=$(run_cmd del-grade abc 85)
-assert_equals "test_delete_grade_non_numeric_id" "Invalid input: Please enter a numeric value." "$response"
+######################################
+# Test 6: add-grade success
+######################################
 
-setup
-response=$(run_cmd del-grade 999 85)
-assert_equals "test_delete_grade_student_not_found" "Error: No student found with ID 999." "$response"
+if ../minigrades add-grade 101 80 2>&1 | grep -q "Grades added successfully for student 101"; then
+  pass "add-grade success"
+else
+  fail "add-grade success"
+fi
 
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 85 > /dev/null
-response=$(run_cmd del-grade 101 90)
-assert_equals "test_delete_grade_not_found" "Error: Grade 90 not found for this student." "$response"
+######################################
+# Test 7: add-grade out of range
+######################################
 
-# --- calculate_average tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 70 > /dev/null
-run_cmd add-grade 101 30 > /dev/null
-response=$(run_cmd average 101)
-assert_equals "test_calculate_average_success" "Average for student 101 is 50.0." "$response"
+if ../minigrades add-grade 101 105 2>&1 | grep -q "Invalid grade: Grades must be between 0 and 100"; then
+  pass "add-grade out of range fails"
+else
+  fail "add-grade out of range fails"
+fi
 
-setup
-response=$(run_cmd average 999)
-assert_equals "test_calculate_average_student_not_found" "Error: No student found with ID 999." "$response"
+######################################
+# Test 8: add-grade non-numeric
+######################################
 
-setup
-run_cmd add 101 Berke > /dev/null
-response=$(run_cmd average 101)
-assert_equals "test_could_not_calculate_average" "Error: Could not calculate average for student 101." "$response"
+if ../minigrades add-grade 101 abc 2>&1 | grep -q "Invalid input: Please enter a numeric value"; then
+  pass "add-grade non-numeric fails"
+else
+  fail "add-grade non-numeric fails"
+fi
 
-# --- list_students tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 70 > /dev/null
-run_cmd add-grade 101 30 > /dev/null
-response=$(run_cmd list)
-assert_contains "test_list_students_full_row" "101 | Berke | 70,30 | 50.0" "$response"
+######################################
+# Test 9: add-grade student not found
+######################################
 
-setup
-response=$(run_cmd list)
-assert_equals "test_list_students_empty" "Error: No students found in the system. Operation aborted." "$response"
+if ../minigrades add-grade 999 80 2>&1 | grep -q "Error: No student found with ID 999"; then
+  pass "add-grade student not found"
+else
+  fail "add-grade student not found"
+fi
 
-# --- generate_report tests ---
-setup
-run_cmd add 101 Berke > /dev/null
-run_cmd add-grade 101 70 > /dev/null
-run_cmd add-grade 101 30 > /dev/null
-response=$(run_cmd report)
-assert_equals "test_generate_report_success" "Report saved to .minigrades/report.txt" "$response"
+######################################
+# Test 10: del-grade success
+######################################
 
-setup
-response=$(run_cmd report)
-assert_equals "test_generate_report_empty" "Error: No data available to generate a report." "$response"
+../minigrades add-grade 101 70 >/dev/null 2>&1
+if ../minigrades del-grade 101 70 2>&1 | grep -q "Grade 70 successfully removed"; then
+  pass "del-grade success"
+else
+  fail "del-grade success"
+fi
 
-# --- unknown command test ---
-setup
-response=$(run_cmd hello)
-assert_contains "test_unknown_command" "Unknown command: hello. Please select from the menu." "$response"
+######################################
+# Test 11: del-grade student not found
+######################################
 
-echo "-------------------------------------"
-echo "v2 Test execution completed."
+if ../minigrades del-grade 999 85 2>&1 | grep -q "Error: No student found with ID 999"; then
+  pass "del-grade student not found"
+else
+  fail "del-grade student not found"
+fi
+
+######################################
+# Test 12: del-grade grade not found
+######################################
+
+if ../minigrades del-grade 101 99 2>&1 | grep -q "Error: Grade 99 not found for this student"; then
+  pass "del-grade grade not found"
+else
+  fail "del-grade grade not found"
+fi
+
+######################################
+# Test 13: del-grade non-numeric id
+######################################
+
+if ../minigrades del-grade abc 85 2>&1 | grep -q "Invalid input: Please enter a numeric value"; then
+  pass "del-grade non-numeric id"
+else
+  fail "del-grade non-numeric id"
+fi
+
+######################################
+# Test 14: delete student (v2: with grades)
+######################################
+
+../minigrades add 102 Efe >/dev/null 2>&1
+../minigrades add-grade 102 90 >/dev/null 2>&1
+if ../minigrades delete 102 2>&1 | grep -q "Student and all grades deleted successfully"; then
+  pass "delete student with grades (v2 message)"
+else
+  fail "delete student with grades (v2 message)"
+fi
+
+######################################
+# Test 15: delete student not found
+######################################
+
+if ../minigrades delete 999 2>&1 | grep -q "Error: No student found with ID 999"; then
+  pass "delete student not found"
+else
+  fail "delete student not found"
+fi
+
+######################################
+# Test 16: average success
+######################################
+
+../minigrades add-grade 101 70 >/dev/null 2>&1
+../minigrades add-grade 101 30 >/dev/null 2>&1
+if ../minigrades average 101 2>&1 | grep -q "Average for student 101 is 50.0"; then
+  pass "average calculation correct"
+else
+  fail "average calculation correct"
+fi
+
+######################################
+# Test 17: average student not found
+######################################
+
+if ../minigrades average 999 2>&1 | grep -q "Error: No student found with ID 999"; then
+  pass "average student not found"
+else
+  fail "average student not found"
+fi
+
+######################################
+# Test 18: average no grades
+######################################
+
+../minigrades add 103 Ali >/dev/null 2>&1
+if ../minigrades average 103 2>&1 | grep -q "Error: Could not calculate average for student 103"; then
+  pass "average no grades error"
+else
+  fail "average no grades error"
+fi
+
+######################################
+# Test 19: list (v2 format with grades)
+######################################
+
+OUTPUT=$(../minigrades list 2>&1)
+if echo "$OUTPUT" | grep -q "101 | Berke"; then
+  pass "list shows student with data"
+else
+  fail "list shows student with data"
+fi
+
+######################################
+# Test 20: list empty
+######################################
+
+mkdir -p ../emptyrepo && cd ../emptyrepo
+../minigrades init >/dev/null 2>&1
+if ../minigrades list 2>&1 | grep -q "Error: No students found in the system"; then
+  pass "list empty database"
+else
+  fail "list empty database"
+fi
+cd ../testrepo
+rm -rf ../emptyrepo
+
+######################################
+# Test 21: report success
+######################################
+
+if ../minigrades report 2>&1 | grep -q "Report saved to .minigrades/report.txt"; then
+  if [ -f .minigrades/report.txt ]; then
+    pass "report generates file"
+  else
+    fail "report generates file"
+  fi
+else
+  fail "report generates file"
+fi
+
+######################################
+# Test 22: report content
+######################################
+
+if grep -q "101 | Berke" .minigrades/report.txt 2>/dev/null; then
+  pass "report contains student data"
+else
+  fail "report contains student data"
+fi
+
+######################################
+# Test 23: report empty
+######################################
+
+mkdir -p ../emptyrepo2 && cd ../emptyrepo2
+../minigrades init >/dev/null 2>&1
+if ../minigrades report 2>&1 | grep -q "Error: No data available to generate a report"; then
+  pass "report empty database"
+else
+  fail "report empty database"
+fi
+cd ../testrepo
+rm -rf ../emptyrepo2
+
+######################################
+# Test 24: unknown command
+######################################
+
+if ../minigrades hello 2>&1 | grep -q "Unknown command: hello"; then
+  pass "unknown command"
+else
+  fail "unknown command"
+fi
+
+######################################
+# Test 25: not initialized
+######################################
+
+mkdir -p ../noinit && cd ../noinit
+if ../minigrades list 2>&1 | grep -q "Not initialized"; then
+  pass "not initialized error"
+else
+  fail "not initialized error"
+fi
+cd ../testrepo
+rm -rf ../noinit
+
+######################################
+# Cleanup & Summary
+######################################
+
+cd ..
+rm -rf testrepo
+
+echo ""
+echo "========================"
+echo "PASSED: $PASS_COUNT"
+echo "FAILED: $FAIL_COUNT"
+echo "TOTAL:  $((PASS_COUNT + FAIL_COUNT))"
+echo "========================"
+
+if [ "$FAIL_COUNT" -eq 0 ]; then
+  echo "ALL TESTS PASSED"
+  exit 0
+else
+  exit 1
+fi

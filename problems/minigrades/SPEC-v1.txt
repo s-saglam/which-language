@@ -1,74 +1,187 @@
-PROJECT: mini-grades
-AUTHOR: berkevnl
-VERSION: v1
-DATE: 2026-03-14
+MiniGrades Specification
+Version: 1.0
+Command name: minigrades
+External libraries: NOT allowed
+Standard library: Allowed
+Persistent storage: Local filesystem only
 
 ========================================
-OVERVIEW
+1. Overview
 ========================================
 
-mini-grades is a command-line student management 
-and performance tracking tool.
-It focuses on maintaining student records and persists 
-basic identity data in a structured local environment.
+MiniGrades is a minimal command-line student management
+and grade tracking tool.
 
-All data is persisted in a directory called .minigrades/ 
-in the current working directory.
+The executable must be called:
 
-========================================
-FUNCTIONS
-========================================
+    minigrades
 
---- add_student ---
-Usage: User provides a Unique ID and a Name.
-Checks if the ID already exists in the system using the "ID |" pattern.
-Output: "Student added successfully." or "Error: Student with ID <id> already exists."
+All data must be stored in:
 
---- add_grade ---
-Usage: User provides the Student ID and a grade.
-Validates that the input is numeric and within 0-100.
-Note: In v1, this function only records the grade; complex editing is not supported.
-Output: "Grades added successfully for student <id>." or "Error: No student found with ID <id>."
+    .minigrades/
 
---- delete_student ---
-Usage: User provides the ID of the student to be removed.
-Finds and removes the student record from the system.
-Output: "Student deleted successfully." or "Error: No student found with ID <id>."
+All commands operate relative to current directory.
 
---- calculate_average ---
-Usage: User provides the ID of the student.
-Output: Displays "Average calculation will be implemented in future weeks." or "Error: No student found with ID <id>."
+----------------------------------------
 
---- list_students ---
-Usage: Select "list" command.
-Displays all students currently in the system.
-Output: A list showing "ID | Name" or "Error: No students found in the system. Operation aborted."
+Supported commands:
+
+    minigrades init
+    minigrades add <id> <name>
+    minigrades add-grade <id> <grade>
+    minigrades delete <id>
+    minigrades list
+    minigrades average <id>
 
 ========================================
-DATA FORMAT (v1)
+2. Data Storage
 ========================================
 
-File: .minigrades/report.txt
-Format: One student per line, fields separated by |
-(Note: Grades and Average columns are placeholders/empty in this version)
+After init:
 
-Example: 
-ID  | NAME
+    .minigrades/
+        data.txt
+
+data.txt:
+    One student per line.
+    Format: <id>|<name>|<grade1>,<grade2>,...
+
+    Example:
+    101|Berke|70,30
+    102|Efe|
+
+    If a student has no grades, the grades field is empty.
+
+========================================
+3. Command Specifications
+========================================
+
+----------------------------------------
+3.1 init
+----------------------------------------
+
+Create .minigrades/ directory and empty data.txt file.
+
+If already exists:
+    print "Already initialized"
+Exit 0.
+
+----------------------------------------
+3.2 add <id> <name>
+----------------------------------------
+
+If not initialized:
+    print "Not initialized. Run: minigrades init"
+    exit 1
+
+If id is not a positive integer:
+    print "Invalid input: Please enter a numeric value."
+    exit 1
+
+If student with id already exists:
+    print "Error: Student with ID <id> already exists."
+    exit 1
+
+Add student to data.txt with empty grades.
+
+Print:
+    Student added successfully.
+
+----------------------------------------
+3.3 add-grade <id> <grade>
+----------------------------------------
+
+If not initialized:
+    print "Not initialized. Run: minigrades init"
+    exit 1
+
+If id or grade is not numeric:
+    print "Invalid input: Please enter a numeric value."
+    exit 1
+
+If grade < 0 or grade > 100:
+    print "Invalid grade: Grades must be between 0 and 100."
+    exit 1
+
+If student not found:
+    print "Error: No student found with ID <id>."
+    exit 1
+
+Append grade to student's grade list.
+
+Print:
+    Grades added successfully for student <id>.
+
+----------------------------------------
+3.4 delete <id>
+----------------------------------------
+
+If not initialized:
+    print "Not initialized. Run: minigrades init"
+    exit 1
+
+If student not found:
+    print "Error: No student found with ID <id>."
+    exit 1
+
+Remove student from data.txt.
+
+Print:
+    Student deleted successfully.
+
+----------------------------------------
+3.5 list
+----------------------------------------
+
+If not initialized:
+    print "Not initialized. Run: minigrades init"
+    exit 1
+
+If no students:
+    print "Error: No students found in the system. Operation aborted."
+    exit 1
+
+Output format (exactly):
+
+ID | Name
 -----------
-101 | Berke
-102 | Efe
+<id> | <name>
+<id> | <name>
+
+Students listed in insertion order (file order).
+
+----------------------------------------
+3.6 average <id>
+----------------------------------------
+
+If not initialized:
+    print "Not initialized. Run: minigrades init"
+    exit 1
+
+If student not found:
+    print "Error: No student found with ID <id>."
+    exit 1
+
+In v1, average is not yet implemented:
+    print "Average calculation will be implemented in future weeks."
 
 ========================================
-ERROR HANDLING
+4. Error Handling
 ========================================
 
-- Invalid command: "Unknown command: <command>. Please select from the menu."
-- Duplicate ID: "Error: Student with ID <id> already exists."
-- Non-numeric input: "Invalid input: Please enter a numeric value."
-- Student not found: "Error: No student found with ID <id>."
-- Empty database: "Error: No students found in the system. Operation aborted."
-- Grade range error: "Invalid grade: Grades must be between 0 and 100."
-- Not path exists: "Not initialized. Run: python solution.py init"
+- Unknown command:
+    print "Unknown command: <command>. Please select from the menu."
+    exit 1
+
+========================================
+5. Determinism Rules
 ========================================
 
+- No extra spaces in output
+- No debug output
+- Exact string matching required
+- Exit 0 on success, exit 1 on error
+
+========================================
 END
+========================================

@@ -33,6 +33,62 @@ Every contribution — human or AI — follows this tight loop:
 - **Before ending your session**: update `plan.md` with next steps and open questions
 - **Always**: follow the contributor protocol in `AGENT.md`
 
+## Problem structure (mandatory)
+
+Every problem lives under `problems/<name>/` and **must** contain exactly these 5 files:
+
+```
+problems/<name>/
+  problem.json       # metadata + prompt templates
+  SPEC-v1.txt        # v1 specification (deterministic)
+  SPEC-v2.txt        # v2 specification (extends v1)
+  test-v1.sh         # v1 test suite
+  test-v2.sh         # v2 test suite
+```
+
+### problem.json (required keys)
+
+```json
+{
+  "name": "ProblemName",
+  "binary_name": "problemname",
+  "v1_spec": "SPEC-v1.txt",
+  "v1_test": "test-v1.sh",
+  "v1_prompt": "Implement {{binary_name}} as described in SPEC-v1.txt using {{language}}...",
+  "v2_spec": "SPEC-v2.txt",
+  "v2_test": "test-v2.sh",
+  "v2_prompt": "Read SPEC-v2.txt and extend the existing {{binary_name}}..."
+}
+```
+
+All 7 keys (`name`, `binary_name`, `v1_spec`, `v1_test`, `v1_prompt`, `v2_spec`, `v2_test`, `v2_prompt`) are **mandatory**. Missing keys → benchmark.rb aborts.
+
+### SPEC files rules
+
+- Plain text, deterministic, exact-output specifications
+- Section headers with `========` separators
+- Every command: input → exact output string → exit code
+- Determinism rules section mandatory
+- v2 **extends** v1 (superset of commands)
+
+### Test script rules
+
+- Shebang: `#!/usr/bin/env bash`
+- Language-agnostic: call `../minigit` or `../<binary_name>`, never `python3 solution.py`
+- Build step: check for `Makefile`, `build.sh`, `chmod +x`
+- Output format: `PASS: <test name>` or `FAIL: <test name>`
+- Summary block at end:
+  ```
+  PASSED: <n>
+  FAILED: <n>
+  TOTAL:  <n>
+  ```
+- Exit 0 if all pass, exit 1 if any fail
+
+### Canonical example: `problems/minigit/`
+
+Use minigit as the reference when creating new problems.
+
 ## File map (the important ones)
 
 | File | Role | Who edits |
@@ -43,6 +99,7 @@ Every contribution — human or AI — follows this tight loop:
 | `AGENT.md` | Contributor protocol — rules, conventions, checklists | Human |
 | `benchmark.rb` | Benchmark runner — the code the agent extends | Human + Agent |
 | `lib/codexes/*.rb` | Codex adapters — the main extension point | Human + Agent |
+| `problems/*/` | Problem definitions — specs, tests, prompts | Human + Agent |
 
 ## Quick links
 
@@ -50,3 +107,4 @@ Every contribution — human or AI — follows this tight loop:
 - Contributor protocol → [AGENT.md](./AGENT.md)
 - Iteration plan → [plan.md](./plan.md)
 - Proof-of-work log → [walkthrough.md](./walkthrough.md)
+
